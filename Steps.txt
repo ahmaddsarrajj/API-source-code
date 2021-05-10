@@ -1,0 +1,178 @@
+*. Create an Empty Folder in which we created 2 different folders:
+   Server
+   Client
+
+*. In "server" folder and using command Line , issue the following command
+   dotnet new webapi
+
+*. In "client" folder and using command line, issue the following command
+   ng new App01
+
+*. Open the "server" application using VSCode.
+*. Create a new Folder called "Model" & add new class student as the following
+   namespace Models {
+    public class Student {
+        public int ID { get; set; }
+        public string Name { get; set; }
+        public bool Pass { get; set; }
+    }
+   }   
+
+*. Add another class named "StudentManager' that returns a "Random" Pass/Failed list
+   of students
+   public class StudentManager {
+        public List<Student> GetResults () {
+            List<Student> oList = new List<Student> ();
+            var r = new Random();
+            for (int i = 0; i < 10; i++) {
+                var x = new Student();
+                x.ID = i;
+                x.Name = string.Format("Name {0}",i.ToString());
+                x.Pass = (r.Next() % 2 == 0);
+                oList.Add(x);
+            }
+            return oList;
+        }
+    }
+
+*. Add new Controller named "Student" with the following method:
+        [HttpGet]
+        [Route("GetResults")]
+        public List<Student> ListenToResults () {
+            Models.StudentManager StMgr = new Models.StudentManager();          
+            return StMgr.GetResults();
+        }
+
+*. Try the API from PostMan to assure that everything is working correctly.
+
+*. Add the Following CORS Policy to Startup.cs to allow the Angular Application to call the API
+    
+   In ConfigureServices:
+   ----------------------------
+   services.AddCors(options => 
+            { 
+                options.AddPolicy("CorsPolicy", builder => builder
+                .WithOrigins("http://localhost:4200")
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials()); 
+            });
+   ----------------------------
+
+   In Configure
+   ----------------------------
+   app.UseRouting();
+   app.UseCors("CorsPolicy");
+   app.UseAuthorization();
+   ----------------------------
+
+*. In the "Client" Application:
+   *. in AppModule , import { HttpClientModule } from '@angular/common/http';
+   *. in AppComponent.ts , call the API Endpoint to display data 
+       constructor(private apiCaller : HttpClient)
+ 	{
+   	  this.apiCaller.get('http://localhost:5000/api/Student/GetResults').subscribe((data : [any]) => {     
+            this.data = data;
+          })
+        }
+
+*. in AppComponent.html add the following to display the results of each Student
+   <ul>
+ <li *ngFor='let s of data'>
+  {{s.name}}
+  <b *ngIf='s.pass' style='color:green'>PASS</b>
+  <b *ngIf='!s.pass' style='color:red'>Failed</b>
+ </li>
+</ul>
+
+*. Till now, this is a typical Client / Server Application where we are need to refresh the screen
+   to re-call the API to get results back.
+
+*. Let's make the exercise more smart!! By Using SignalRCore
+
+*. In "Server" Application just add a new class named "StudentHub" that inherits from "Hub" Class
+	using Microsoft.AspNetCore.SignalR;
+	public class StudentHub : Hub 
+	{
+	}
+
+*. In ConfigureServices:
+   ----------------------------
+   services.AddSignalR();
+   services.AddControllers();
+   ----------------------------
+
+   In Configure
+   ----------------------------
+   app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+                endpoints.MapHub<StudentHub>("/results");
+            });
+   ----------------------------
+
+*. Now in the Student Controller add the following method
+   public void KeepSendingResults()
+        {
+            while(true)
+            {
+                Models.StudentManager StMgr = new Models.StudentManager();
+                _hub.Clients.All.SendAsync("NewResults",StMgr.GetResults());  
+                Thread.Sleep(3000);              
+            }
+        }
+
+  And in the previously created method make the following change
+   public List<Student> ListenToResults () {
+            Models.StudentManager StMgr = new Models.StudentManager();
+            Thread oThread = new Thread(()=>{
+                KeepSendingResults();
+            });
+            oThread.Start();
+            return StMgr.GetResults();
+        }
+
+*. In The Client Application :
+   *. npm install @aspnet/signalr
+
+   *. Add the following import 
+      import * as signalR from '@aspnet/signalr';
+
+   *. Add The following property to the AppComponent class  
+      private hubConnection: signalR.HubConnection;
+
+   *. In AppComponent.ts file add the following methods
+      public startConnection = () => {
+    this.hubConnection = new signalR.HubConnectionBuilder()
+                            .withUrl('http://localhost:5000/results')
+                            .build();
+ 
+    this.hubConnection
+      .start()
+      .then(() => console.log('Connection started'))
+      .catch(err => console.log('Error while starting connection: ' + err))
+  }
+ 
+  public addTransferChartDataListener = () => {
+    this.hubConnection.on('NewResults', (data) => {
+      this.data = data;
+      console.log(data);
+    });
+  }
+
+  *. In the Subscribe Method do the following
+     constructor(private apiCaller : HttpClient)
+ {
+    this.apiCaller.get('http://localhost:5000/api/Student/GetResults').subscribe((data : [any]) => {
+     //console.log(data);
+     this.data = data;
+     this.startConnection();
+     this.addTransferChartDataListener();
+   })
+ }
+
+   And Let the magic begins!!!!!
+
+*. If you open the application in as many as you want browsers , all of them will be updated 
+   at the same time and the SERVER IS NOW SENDING DATA TO THE CLIENT !!!
+  
