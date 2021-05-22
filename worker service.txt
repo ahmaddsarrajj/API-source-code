@@ -1,0 +1,4 @@
+1. Task : https://dotnettutorials.net/lesson/asynchronous-programming-in-csharp/
+2. Async/await : https://www.c-sharpcorner.com/article/async-and-await-in-c-sharp/
+3. Worker Service : https://medium.com/@nickfane/introduction-to-worker-services-in-net-core-3-0-4bb3fc631225
+4. API Versioning : https://www.infoworld.com/article/3562355/how-to-use-api-versioning-in-aspnet-core.html
